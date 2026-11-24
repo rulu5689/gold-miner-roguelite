@@ -56,10 +56,10 @@ cd backend
 python3 -m venv .venv
 source .venv/bin/activate        # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
-uvicorn app.main:app --reload --port 8000
+uvicorn app.main:app --reload --port 8001
 ```
 
-Check it: <http://localhost:8000/health> returns `{"status":"ok"}`. API docs: <http://localhost:8000/docs>.
+Check it: <http://localhost:8001/health> returns `{"status":"ok"}`. API docs: <http://localhost:8001/docs>.
 
 CORS allows `http://localhost:5173` and `http://127.0.0.1:5173` by default.
 Override with a comma-separated `CORS_ORIGINS` environment variable.
@@ -77,7 +77,7 @@ npm run dev
 Open <http://localhost:5173>. You should see **Gold Miner Roguelite**, **Frontend running**
 and, when the backend is up, **Backend connected** (otherwise "Backend not connected").
 
-The backend URL defaults to `http://localhost:8000`. To change it, copy
+The backend URL defaults to `http://localhost:8001`. To change it, copy
 `frontend/.env.example` to `frontend/.env` and set `VITE_API_BASE_URL`.
 
 ## Tests
