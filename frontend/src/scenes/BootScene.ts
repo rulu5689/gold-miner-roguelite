@@ -2,7 +2,7 @@ import Phaser from "phaser";
 import { fetchMinerals } from "../api/content";
 import { checkBackendHealth } from "../api/health";
 import { API_BASE_URL } from "../config";
-import { newRun } from "../game/runState";
+import { GameApi } from "../api/game";
 import { backendStatusLabel } from "../ui/statusText";
 
 export class BootScene extends Phaser.Scene {
@@ -58,8 +58,20 @@ export class BootScene extends Phaser.Scene {
 
     prompt.setText("Press SPACE or click to start");
     this.tweens.add({ targets: prompt, alpha: 0.35, duration: 700, yoyo: true, repeat: -1 });
-    const start = () => this.scene.start("GameScene", newRun());
-    this.input.keyboard?.once("keydown-SPACE", start);
-    this.input.once("pointerdown", start);
+    const api = new GameApi(API_BASE_URL);
+    this.registry.set("api", api);
+    let starting = false;
+    const start = async () => {
+      if (starting) return;
+      starting = true;
+      try {
+        this.scene.start("GameScene", await api.createRun());
+      } catch {
+        starting = false;
+        prompt.setText("Could not start a run. Is the backend running?").setColor("#ff6b6b");
+      }
+    };
+    this.input.keyboard?.on("keydown-SPACE", start);
+    this.input.on("pointerdown", start);
   }
 }

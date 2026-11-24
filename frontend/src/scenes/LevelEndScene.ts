@@ -1,23 +1,16 @@
 import Phaser from "phaser";
-import { targetForLevel } from "../game/rules";
-import type { RunState } from "../game/runState";
-
-interface LevelEndData {
-  run: RunState;
-  passed: boolean;
-}
+import type { LevelResult } from "../game/types";
 
 export class LevelEndScene extends Phaser.Scene {
   constructor() {
     super("LevelEndScene");
   }
 
-  create({ run, passed }: LevelEndData): void {
+  create({ run, passed, money, target }: LevelResult): void {
     const { width, height } = this.scale;
-    const target = targetForLevel(run.level);
 
     this.add
-      .text(width / 2, height / 2 - 70, passed ? `Level ${run.level} complete!` : "Game Over", {
+      .text(width / 2, height / 2 - 70, passed ? `Level ${run.level - 1} complete!` : "Game Over", {
         fontFamily: "Georgia, serif",
         fontSize: "44px",
         color: passed ? "#ffd34d" : "#ff6b6b",
@@ -25,7 +18,7 @@ export class LevelEndScene extends Phaser.Scene {
       .setOrigin(0.5);
 
     this.add
-      .text(width / 2, height / 2, `Money $${run.money}   /   Target $${target}`, {
+      .text(width / 2, height / 2, `Money $${money}   /   Target $${target}`, {
         fontFamily: "monospace",
         fontSize: "22px",
         color: "#e8e0d0",
@@ -45,7 +38,7 @@ export class LevelEndScene extends Phaser.Scene {
     const next = () => {
       if (done) return;
       done = true;
-      if (passed) this.scene.start("GameScene", { ...run, level: run.level + 1 });
+      if (passed) this.scene.start("GameScene", run);
       else this.scene.start("BootScene");
     };
     // Short delay so a key held at the end of the level doesn't skip this screen.

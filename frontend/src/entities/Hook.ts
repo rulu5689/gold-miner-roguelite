@@ -66,6 +66,13 @@ export class Hook<T extends Grabbable> {
     return true;
   }
 
+  /** Let go of everything carried (e.g. an exploding barrel). The hook keeps reeling in. */
+  dropAll(): T[] {
+    const dropped = this.carried;
+    this.carried = [];
+    return dropped;
+  }
+
   update(dt: number, items: readonly T[]): HookEvents<T> {
     const events: HookEvents<T> = { grabbed: [], delivered: [] };
     let remaining = dt;

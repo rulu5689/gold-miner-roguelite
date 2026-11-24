@@ -1,6 +1,5 @@
-import { GAME_HEIGHT, GAME_WIDTH } from "../config";
-import type { FieldArea } from "./levelGenerator";
+import { GAME_WIDTH } from "../config";
 
+/** World is 960 x 540, the same coordinate system the backend places items in. */
 export const GROUND_Y = 100;
 export const HOOK_ORIGIN = { x: GAME_WIDTH / 2, y: 82 };
-export const FIELD_AREA: FieldArea = { left: 30, top: 140, right: GAME_WIDTH - 30, bottom: GAME_HEIGHT - 20 };

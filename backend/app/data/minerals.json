@@ -1,9 +1,10 @@
 [
-  {"id": "gold_small",  "name": "Small Gold",  "shape": "circle",  "radius": 12, "weight": 1, "value": 50,  "color": "#ffd34d", "spawn_weight": 30, "min_level": 1},
-  {"id": "gold_medium", "name": "Gold",        "shape": "circle",  "radius": 22, "weight": 3, "value": 150, "color": "#f5c022", "spawn_weight": 20, "min_level": 1},
-  {"id": "gold_large",  "name": "Large Gold",  "shape": "circle",  "radius": 40, "weight": 8, "value": 500, "color": "#e6a800", "spawn_weight": 6,  "min_level": 1},
-  {"id": "rock_small",  "name": "Small Rock",  "shape": "circle",  "radius": 16, "weight": 3, "value": 20,  "color": "#8a8580", "spawn_weight": 18, "min_level": 1},
-  {"id": "rock_large",  "name": "Large Rock",  "shape": "circle",  "radius": 34, "weight": 9, "value": 60,  "color": "#6b6661", "spawn_weight": 10, "min_level": 1},
-  {"id": "diamond",     "name": "Diamond",     "shape": "diamond", "radius": 10, "weight": 1, "value": 600, "color": "#9ff3ff", "spawn_weight": 4,  "min_level": 2},
-  {"id": "mystery_bag", "name": "Mystery Bag", "shape": "bag",     "radius": 18, "weight": 2, "value": 20,  "value_max": 800, "color": "#a0703c", "spawn_weight": 6, "min_level": 1}
+  {"id": "gold_small",  "name": "Small Gold",  "category": "gold",      "shape": "circle",  "radius": 12, "weight": 1, "value": 50,  "color": "#ffd34d", "spawn_weight": 30, "min_level": 1},
+  {"id": "gold_medium", "name": "Gold",        "category": "gold",      "shape": "circle",  "radius": 22, "weight": 3, "value": 150, "color": "#f5c022", "spawn_weight": 20, "min_level": 1},
+  {"id": "gold_large",  "name": "Large Gold",  "category": "gold",      "shape": "circle",  "radius": 40, "weight": 8, "value": 400, "color": "#e6a800", "spawn_weight": 7,  "min_level": 1},
+  {"id": "diamond",     "name": "Diamond",     "category": "gem",       "shape": "diamond", "radius": 10, "weight": 1, "value": 800, "color": "#9ff3ff", "spawn_weight": 4,  "min_level": 2},
+  {"id": "gold_chest",  "name": "Golden Chest","category": "chest",     "shape": "chest",   "radius": 18, "weight": 2, "value": 100, "value_max": 700, "color": "#d4a017", "spawn_weight": 6, "min_level": 1},
+  {"id": "rock_small",  "name": "Small Rock",  "category": "rock",      "shape": "circle",  "radius": 16, "weight": 3, "value": 20,  "color": "#8a8580", "spawn_weight": 18, "min_level": 1},
+  {"id": "rock_large",  "name": "Large Rock",  "category": "rock",      "shape": "circle",  "radius": 34, "weight": 9, "value": 60,  "color": "#6b6661", "spawn_weight": 12, "min_level": 1},
+  {"id": "tnt_barrel",  "name": "TNT Barrel",  "category": "explosive", "shape": "barrel",  "radius": 16, "weight": 1, "value": 0,   "color": "#c0392b", "spawn_weight": 5,  "min_level": 2, "explosion_radius": 110}
 ]

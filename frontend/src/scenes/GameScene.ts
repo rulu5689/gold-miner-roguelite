@@ -1,43 +1,50 @@
 import Phaser from "phaser";
+import type { GameApi } from "../api/game";
 import { drawMineral } from "../components/drawMineral";
 import { drawMiner } from "../components/drawMiner";
 import { GAME_HEIGHT, GAME_WIDTH } from "../config";
 import { Hook } from "../entities/Hook";
 import { DEFAULT_HOOK_PARAMS } from "../game/hookParams";
-import { FIELD_AREA, GROUND_Y, HOOK_ORIGIN } from "../game/layout";
-import { generateLevel } from "../game/levelGenerator";
-import { LEVEL_DURATION_SECONDS, targetForLevel } from "../game/rules";
-import { levelSeed, type RunState } from "../game/runState";
-import type { FieldItem, Mineral } from "../game/types";
+import { GROUND_Y, HOOK_ORIGIN } from "../game/layout";
+import type { FieldItem, Mineral, RunState } from "../game/types";
 
 /** Longest frame we simulate in one go (avoids huge jumps after a tab switch). */
 const MAX_FRAME_SECONDS = 0.1;
 
+/**
+ * Plays one level. The frontend handles the hook, collisions and drawing;
+ * every rule decision (money, explosions, level result) comes from the backend.
+ */
 export class GameScene extends Phaser.Scene {
   private run!: RunState;
+  private api!: GameApi;
+  private minerals!: Map<string, Mineral>;
   private hook!: Hook<FieldItem>;
   private field: FieldItem[] = [];
   private sprites = new Map<number, Phaser.GameObjects.Container>();
   private hookGraphics!: Phaser.GameObjects.Graphics;
   private hud!: { money: Phaser.GameObjects.Text; target: Phaser.GameObjects.Text; level: Phaser.GameObjects.Text; time: Phaser.GameObjects.Text };
-  private timeLeft = LEVEL_DURATION_SECONDS;
+  private timeLeft = 0;
   private ended = false;
+  /** Backend calls run one after another, so "finish level" always comes after the last collect. */
+  private requests: Promise<unknown> = Promise.resolve();
 
   constructor() {
     super("GameScene");
   }
 
   init(run: RunState): void {
-    this.run = { ...run };
-    this.field = [];
+    this.run = structuredClone(run);
+    this.field = this.run.items;
     this.sprites.clear();
-    this.timeLeft = LEVEL_DURATION_SECONDS;
+    this.timeLeft = run.time_limit;
     this.ended = false;
+    this.requests = Promise.resolve();
   }
 
   create(): void {
-    const minerals = this.registry.get("minerals") as Mineral[];
-    const byId = new Map(minerals.map((m) => [m.id, m]));
+    this.api = this.registry.get("api") as GameApi;
+    this.minerals = new Map((this.registry.get("minerals") as Mineral[]).map((m) => [m.id, m]));
 
     // Sky and dirt
     this.add.rectangle(0, 0, GAME_WIDTH, GROUND_Y, 0x7fa7c9).setOrigin(0);
@@ -45,10 +52,8 @@ export class GameScene extends Phaser.Scene {
     this.add.rectangle(0, GROUND_Y, GAME_WIDTH, 4, 0x3b2410).setOrigin(0);
     drawMiner(this, HOOK_ORIGIN.x, GROUND_Y);
 
-    this.field = generateLevel(levelSeed(this.run), this.run.level, minerals, FIELD_AREA);
     for (const item of this.field) {
-      const sprite = drawMineral(this, byId.get(item.mineralId)!).setPosition(item.x, item.y);
-      this.sprites.set(item.id, sprite);
+      this.sprites.set(item.id, drawMineral(this, this.mineral(item)).setPosition(item.x, item.y));
     }
 
     this.hook = new Hook<FieldItem>(HOOK_ORIGIN.x, HOOK_ORIGIN.y, { ...DEFAULT_HOOK_PARAMS }, { width: GAME_WIDTH, height: GAME_HEIGHT });
@@ -83,7 +88,12 @@ export class GameScene extends Phaser.Scene {
     }
 
     const { grabbed, delivered } = this.hook.update(dt, this.field);
-    if (grabbed.length > 0) this.field = this.field.filter((item) => !grabbed.includes(item));
+    if (grabbed.length > 0) {
+      this.field = this.field.filter((item) => !grabbed.includes(item));
+      for (const item of grabbed) {
+        if (this.mineral(item).category === "explosive") this.detonate(item);
+      }
+    }
     for (const item of this.hook.carried) this.sprites.get(item.id)?.setPosition(item.x, item.y);
     for (const item of delivered) this.collect(item);
 
@@ -91,27 +101,76 @@ export class GameScene extends Phaser.Scene {
     this.drawHook();
   }
 
+  private mineral(item: FieldItem): Mineral {
+    return this.minerals.get(item.mineral_id)!;
+  }
+
+  private send<T>(call: () => Promise<T>): Promise<T> {
+    const next = this.requests.then(call);
+    this.requests = next.catch(() => undefined);
+    next.catch(() => this.showError());
+    return next;
+  }
+
   private collect(item: FieldItem): void {
-    this.run.money += item.value;
-    this.sprites.get(item.id)?.destroy();
-    this.sprites.delete(item.id);
-    const popup = this.add
-      .text(HOOK_ORIGIN.x + 40, GROUND_Y - 40, `+$${item.value}`, { fontFamily: "monospace", fontSize: "24px", color: "#2e7d32", fontStyle: "bold" })
-      .setOrigin(0, 0.5)
-      .setDepth(20);
-    this.tweens.add({ targets: popup, y: popup.y - 30, alpha: 0, duration: 900, onComplete: () => popup.destroy() });
+    this.removeSprite(item.id);
+    this.popup(`+$${item.value}`, item.value > 0 ? "#2e7d32" : "#5d4037");
+    void this.send(() => this.api.collect(this.run.run_id, item.id)).then((res) => {
+      this.run.money = res.money;
+    });
+  }
+
+  private detonate(barrel: FieldItem): void {
+    this.hook.dropAll();
+    this.removeSprite(barrel.id);
+    const radius = this.mineral(barrel).explosion_radius ?? 0;
+    const blast = this.add.circle(barrel.x, barrel.y, radius, 0xff8c1a, 0.7).setDepth(15).setScale(0.2);
+    this.tweens.add({ targets: blast, scale: 1, alpha: 0, duration: 450, onComplete: () => blast.destroy() });
+    this.cameras.main.shake(200, 0.006);
+
+    void this.send(() => this.api.explode(this.run.run_id, barrel.id)).then(({ destroyed_ids }) => {
+      this.field = this.field.filter((item) => !destroyed_ids.includes(item.id));
+      destroyed_ids.forEach((id) => this.removeSprite(id));
+    });
   }
 
   private endLevel(): void {
     this.ended = true;
-    const passed = this.run.money >= targetForLevel(this.run.level);
     this.updateHud();
-    this.scene.start("LevelEndScene", { run: this.run, passed });
+    void this.send(() => this.api.finishLevel(this.run.run_id)).then((result) => this.scene.start("LevelEndScene", result));
+  }
+
+  private removeSprite(id: number): void {
+    this.sprites.get(id)?.destroy();
+    this.sprites.delete(id);
+  }
+
+  private popup(text: string, color: string): void {
+    const label = this.add
+      .text(HOOK_ORIGIN.x + 40, GROUND_Y - 40, text, { fontFamily: "monospace", fontSize: "24px", color, fontStyle: "bold" })
+      .setOrigin(0, 0.5)
+      .setDepth(20);
+    this.tweens.add({ targets: label, y: label.y - 30, alpha: 0, duration: 900, onComplete: () => label.destroy() });
+  }
+
+  private showError(): void {
+    this.ended = true;
+    this.add
+      .text(GAME_WIDTH / 2, GAME_HEIGHT / 2, "Lost connection to the backend.\nRestart it and refresh the page.", {
+        fontFamily: "monospace",
+        fontSize: "22px",
+        color: "#ffffff",
+        backgroundColor: "#b71c1c",
+        align: "center",
+        padding: { x: 16, y: 12 },
+      })
+      .setOrigin(0.5)
+      .setDepth(30);
   }
 
   private updateHud(): void {
     this.hud.money.setText(`Money  $${this.run.money}`);
-    this.hud.target.setText(`Target $${targetForLevel(this.run.level)}`);
+    this.hud.target.setText(`Target $${this.run.target}`);
     this.hud.level.setText(`Level ${this.run.level}`);
     this.hud.time.setText(`Time ${Math.ceil(this.timeLeft)}`).setColor(this.timeLeft <= 10 ? "#b71c1c" : "#1d1a14");
   }

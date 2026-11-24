@@ -73,3 +73,15 @@ describe("Hook", () => {
     expect(events.grabbed.map((i) => i.name)).toEqual(["tiny"]);
   });
 });
+
+describe("Hook.dropAll", () => {
+  it("lets go of carried items but keeps reeling", () => {
+    const hook = makeHook();
+    hook.fire();
+    hook.update(0.5, [item("barrel", 480, 250, 1)]);
+    expect(hook.carried).toHaveLength(1);
+    hook.dropAll();
+    expect(hook.carried).toEqual([]);
+    expect(hook.state).toBe("reeling");
+  });
+});

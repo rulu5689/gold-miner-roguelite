@@ -19,3 +19,8 @@ def load_minerals() -> tuple[Mineral, ...]:
     if len(ids) != len(set(ids)):
         raise ValueError("Duplicate mineral ids in minerals.json")
     return tuple(minerals)
+
+
+@lru_cache
+def minerals_by_id() -> dict[str, Mineral]:
+    return {m.id: m for m in load_minerals()}

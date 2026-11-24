@@ -4,7 +4,7 @@ import { BootScene } from "./scenes/BootScene";
 import { GameScene } from "./scenes/GameScene";
 import { LevelEndScene } from "./scenes/LevelEndScene";
 
-new Phaser.Game({
+const game = new Phaser.Game({
   type: Phaser.AUTO,
   parent: "game",
   width: GAME_WIDTH,
@@ -13,3 +13,6 @@ new Phaser.Game({
   scale: { mode: Phaser.Scale.FIT, autoCenter: Phaser.Scale.CENTER_BOTH },
   scene: [BootScene, GameScene, LevelEndScene],
 });
+
+// Development only: lets you inspect the game from the browser console (window.game).
+if (import.meta.env.DEV) (window as unknown as { game: Phaser.Game }).game = game;

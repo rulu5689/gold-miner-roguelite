@@ -7,14 +7,15 @@ client = TestClient(app)
 
 
 def test_minerals_file_is_valid():
-    ids = {m.id for m in load_minerals()}
-    assert {"gold_small", "gold_medium", "gold_large", "rock_small", "rock_large", "diamond", "mystery_bag"} <= ids
+    by_id = {m.id: m for m in load_minerals()}
+    assert by_id["gold_large"].value == 400
+    assert by_id["diamond"].value == 800
+    assert by_id["tnt_barrel"].category == "explosive"
+    assert by_id["gold_chest"].value_max is not None
+    assert "mystery_bag" not in by_id
 
 
 def test_get_minerals_endpoint():
     response = client.get("/config/minerals")
     assert response.status_code == 200
-    body = response.json()
-    assert len(body) == len(load_minerals())
-    bag = next(m for m in body if m["id"] == "mystery_bag")
-    assert bag["value_max"] >= bag["value"]
+    assert len(response.json()) == len(load_minerals())
