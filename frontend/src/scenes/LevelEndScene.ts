@@ -38,7 +38,7 @@ export class LevelEndScene extends Phaser.Scene {
     const next = () => {
       if (done) return;
       done = true;
-      if (passed) this.scene.start("GameScene", run);
+      if (passed) this.scene.start(run.status === "choosing_upgrade" ? "UpgradeScene" : "GameScene", run);
       else this.scene.start("BootScene");
     };
     // Short delay so a key held at the end of the level doesn't skip this screen.

@@ -25,6 +25,17 @@ export function drawMineral(scene: Phaser.Scene, mineral: Mineral): Phaser.GameO
       g.fillPath().strokePath();
       break;
 
+    case "ruby": {
+      const pts = Array.from({ length: 6 }, (_, i) => {
+        const a = (Math.PI / 3) * i + Math.PI / 6;
+        return new Phaser.Math.Vector2(Math.cos(a) * r * 1.15, Math.sin(a) * r * 1.15);
+      });
+      g.fillStyle(color).fillPoints(pts, true);
+      g.lineStyle(2, 0xffc1d6, 0.9).strokePoints(pts, true);
+      g.fillStyle(0xffffff, 0.5).fillCircle(-r * 0.3, -r * 0.3, r * 0.25);
+      break;
+    }
+
     case "chest": {
       const w = r * 2.2;
       const h = r * 1.6;

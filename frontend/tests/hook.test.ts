@@ -1,11 +1,21 @@
 import { describe, expect, it } from "vitest";
 import { Hook, type Grabbable } from "../src/entities/Hook";
-import { DEFAULT_HOOK_PARAMS } from "../src/game/hookParams";
+import { applyModifiers, DEFAULT_HOOK_PARAMS, type HookParams } from "../src/game/hookParams";
 
 type Item = Grabbable & { name: string };
 const bounds = { width: 960, height: 540 };
-const makeHook = () => new Hook<Item>(480, 80, { ...DEFAULT_HOOK_PARAMS }, bounds);
-const item = (name: string, x: number, y: number, weight: number, radius = 12): Item => ({ name, x, y, radius, weight });
+const makeHook = (params: Partial<HookParams> = {}) => new Hook<Item>(480, 80, { ...DEFAULT_HOOK_PARAMS, ...params }, bounds);
+const item = (name: string, x: number, y: number, weight: number, radius = 12, extra: Partial<Item> = {}): Item => ({
+  name,
+  x,
+  y,
+  radius,
+  weight,
+  small: false,
+  magnetic: false,
+  ...extra,
+});
+const smallGold = (name: string, x: number, y: number) => item(name, x, y, 1, 12, { small: true, magnetic: true });
 
 /** Fires straight down (angle is 0 at t=0) and runs until delivery. Returns seconds taken. */
 function fireAndDeliver(hook: Hook<Item>, items: Item[]): { seconds: number; delivered: Item[] } {
@@ -83,5 +93,66 @@ describe("Hook.dropAll", () => {
     hook.dropAll();
     expect(hook.carried).toEqual([]);
     expect(hook.state).toBe("reeling");
+  });
+});
+
+describe("Hook upgrades", () => {
+  it("cannot lift items heavier than maxLiftWeight (Heavy Duty raises it)", () => {
+    const giant = () => item("giant", 480, 300, 16, 40);
+    const weak = makeHook();
+    const { delivered } = fireAndDeliver(weak, [giant()]);
+    expect(delivered).toEqual([]);
+
+    const strong = makeHook({ maxLiftWeight: 30 });
+    expect(fireAndDeliver(strong, [giant()]).delivered.map((i) => i.name)).toEqual(["giant"]);
+  });
+
+  it("reports too-heavy items", () => {
+    const hook = makeHook();
+    hook.fire();
+    const events = hook.update(0.5, [item("giant", 480, 300, 16, 40)]);
+    expect(events.tooHeavy.map((i) => i.name)).toEqual(["giant"]);
+    expect(hook.state).toBe("reeling");
+  });
+
+  it("Magnetic Hook pulls in small gold that is off the hook's path", () => {
+    const off = () => smallGold("off", 520, 300); // 40px to the side of a straight-down throw
+    expect(fireAndDeliver(makeHook(), [off()]).delivered).toEqual([]);
+    expect(fireAndDeliver(makeHook({ magnetRadius: 50 }), [off()]).delivered.map((i) => i.name)).toEqual(["off"]);
+  });
+
+  it("Double Hook grabs two small items in one throw", () => {
+    const items = () => [smallGold("a", 480, 200), smallGold("b", 480, 350)];
+    expect(fireAndDeliver(makeHook(), items()).delivered.map((i) => i.name)).toEqual(["a"]);
+    expect(fireAndDeliver(makeHook({ capacity: 2 }), items()).delivered.map((i) => i.name)).toEqual(["a", "b"]);
+  });
+
+  it("Double Hook stops at a big item instead of grabbing it", () => {
+    const items = [smallGold("a", 480, 200), item("big", 480, 350, 8, 40)];
+    const { delivered } = fireAndDeliver(makeHook({ capacity: 2 }), items);
+    expect(delivered.map((i) => i.name)).toEqual(["a"]);
+  });
+
+  it("Precision grabs from further away", () => {
+    const near = () => item("near", 500, 300, 1, 10); // 20px off the path
+    expect(fireAndDeliver(makeHook(), [near()]).delivered).toEqual([]);
+    expect(fireAndDeliver(makeHook({ grabRadius: 18 }), [near()]).delivered.map((i) => i.name)).toEqual(["near"]);
+  });
+
+  it("applies backend modifiers to the base params", () => {
+    const params = applyModifiers(DEFAULT_HOOK_PARAMS, {
+      reel_speed_mult: 1.2,
+      shoot_speed_mult: 0.85,
+      grab_radius: 12,
+      magnet_radius: 50,
+      capacity: 2,
+      max_lift_weight: 30,
+      strength: 3,
+    });
+    expect(params.reelSpeed).toBeCloseTo(DEFAULT_HOOK_PARAMS.reelSpeed * 1.2);
+    expect(params.shootSpeed).toBeCloseTo(DEFAULT_HOOK_PARAMS.shootSpeed * 0.85);
+    expect(params.grabRadius).toBe(DEFAULT_HOOK_PARAMS.grabRadius + 12);
+    expect(params.strength).toBe(DEFAULT_HOOK_PARAMS.strength + 3);
+    expect([params.magnetRadius, params.capacity, params.maxLiftWeight]).toEqual([50, 2, 30]);
   });
 });

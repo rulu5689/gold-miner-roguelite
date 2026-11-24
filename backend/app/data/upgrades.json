@@ -1,1 +1,7 @@
-[]
+[
+  {"id": "quick_reel",    "name": "Quick Reel",    "description": "Reel speed +20%",                                  "max_stacks": 5, "effects": {"reel_speed_mult": 0.2}},
+  {"id": "magnetic_hook", "name": "Magnetic Hook", "description": "Small gold near the hook is pulled in",            "max_stacks": 3, "effects": {"magnet_radius": 50}},
+  {"id": "heavy_duty",    "name": "Heavy Duty",    "description": "Lift extra-heavy items; heavy loads slow you less", "max_stacks": 1, "effects": {"max_lift_weight": 20, "strength": 3}},
+  {"id": "double_hook",   "name": "Double Hook",   "description": "Grab two small items in one throw",                "max_stacks": 1, "effects": {"capacity": 1}},
+  {"id": "precision",     "name": "Precision",     "description": "Hook shoots 15% slower, but grabs from further",   "max_stacks": 3, "effects": {"shoot_speed_mult": -0.15, "grab_radius": 12}}
+]

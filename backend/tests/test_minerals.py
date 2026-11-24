@@ -13,6 +13,8 @@ def test_minerals_file_is_valid():
     assert by_id["tnt_barrel"].category == "explosive"
     assert by_id["gold_chest"].value_max is not None
     assert "mystery_bag" not in by_id
+    assert by_id["ruby"].crit_bonus == 0.05
+    assert by_id["gold_giant"].weight > 10 and by_id["boulder"].weight > 10
 
 
 def test_get_minerals_endpoint():

@@ -2,6 +2,8 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
+from app.schemas.upgrade import HookModifiers, Upgrade
+
 
 class FieldItem(BaseModel):
     """A concrete object placed in a level. Coordinates are in world units (960 x 540)."""
@@ -24,8 +26,16 @@ class RunState(BaseModel):
     money: int = Field(ge=0)
     target: int
     time_limit: int
-    status: Literal["playing", "game_over"]
+    status: Literal["playing", "choosing_upgrade", "game_over"]
     items: list[FieldItem]
+    #: Upgrade id -> number of stacks owned.
+    upgrades: dict[str, int] = Field(default_factory=dict)
+    #: Derived from `upgrades`; kept in the state so the frontend can use it directly.
+    hook: HookModifiers = Field(default_factory=HookModifiers)
+    #: Chance (0-1) that a collected item is worth double.
+    crit_chance: float = 0
+    #: Offered after passing a level, while status is "choosing_upgrade".
+    upgrade_choices: list[Upgrade] = Field(default_factory=list)
 
 
 class CreateRunRequest(BaseModel):
@@ -39,6 +49,12 @@ class ItemRequest(BaseModel):
 class CollectResponse(BaseModel):
     value: int
     money: int
+    critical: bool
+    crit_chance: float
+
+
+class ChooseUpgradeRequest(BaseModel):
+    upgrade_id: str
 
 
 class ExplodeResponse(BaseModel):

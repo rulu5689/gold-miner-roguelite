@@ -4,9 +4,12 @@ import { drawMineral } from "../components/drawMineral";
 import { drawMiner } from "../components/drawMiner";
 import { GAME_HEIGHT, GAME_WIDTH } from "../config";
 import { Hook } from "../entities/Hook";
-import { DEFAULT_HOOK_PARAMS } from "../game/hookParams";
+import { applyModifiers, DEFAULT_HOOK_PARAMS } from "../game/hookParams";
 import { GROUND_Y, HOOK_ORIGIN } from "../game/layout";
-import type { FieldItem, Mineral, RunState } from "../game/types";
+import type { FieldItem, Mineral, RunState, Upgrade } from "../game/types";
+
+/** A field item plus the flags the hook needs. */
+type HookItem = FieldItem & { small: boolean; magnetic: boolean };
 
 /** Longest frame we simulate in one go (avoids huge jumps after a tab switch). */
 const MAX_FRAME_SECONDS = 0.1;
@@ -19,11 +22,18 @@ export class GameScene extends Phaser.Scene {
   private run!: RunState;
   private api!: GameApi;
   private minerals!: Map<string, Mineral>;
-  private hook!: Hook<FieldItem>;
-  private field: FieldItem[] = [];
+  private hook!: Hook<HookItem>;
+  private field: HookItem[] = [];
   private sprites = new Map<number, Phaser.GameObjects.Container>();
   private hookGraphics!: Phaser.GameObjects.Graphics;
-  private hud!: { money: Phaser.GameObjects.Text; target: Phaser.GameObjects.Text; level: Phaser.GameObjects.Text; time: Phaser.GameObjects.Text };
+  private hud!: {
+    money: Phaser.GameObjects.Text;
+    target: Phaser.GameObjects.Text;
+    level: Phaser.GameObjects.Text;
+    time: Phaser.GameObjects.Text;
+    crit: Phaser.GameObjects.Text;
+    upgrades: Phaser.GameObjects.Text;
+  };
   private timeLeft = 0;
   private ended = false;
   /** Backend calls run one after another, so "finish level" always comes after the last collect. */
@@ -35,7 +45,7 @@ export class GameScene extends Phaser.Scene {
 
   init(run: RunState): void {
     this.run = structuredClone(run);
-    this.field = this.run.items;
+    this.field = [];
     this.sprites.clear();
     this.timeLeft = run.time_limit;
     this.ended = false;
@@ -45,6 +55,10 @@ export class GameScene extends Phaser.Scene {
   create(): void {
     this.api = this.registry.get("api") as GameApi;
     this.minerals = new Map((this.registry.get("minerals") as Mineral[]).map((m) => [m.id, m]));
+    this.field = this.run.items.map((item) => {
+      const m = this.mineral(item);
+      return { ...item, small: m.size === "small", magnetic: m.size === "small" && m.category === "gold" };
+    });
 
     // Sky and dirt
     this.add.rectangle(0, 0, GAME_WIDTH, GROUND_Y, 0x7fa7c9).setOrigin(0);
@@ -56,7 +70,8 @@ export class GameScene extends Phaser.Scene {
       this.sprites.set(item.id, drawMineral(this, this.mineral(item)).setPosition(item.x, item.y));
     }
 
-    this.hook = new Hook<FieldItem>(HOOK_ORIGIN.x, HOOK_ORIGIN.y, { ...DEFAULT_HOOK_PARAMS }, { width: GAME_WIDTH, height: GAME_HEIGHT });
+    const params = applyModifiers(DEFAULT_HOOK_PARAMS, this.run.hook);
+    this.hook = new Hook<HookItem>(HOOK_ORIGIN.x, HOOK_ORIGIN.y, params, { width: GAME_WIDTH, height: GAME_HEIGHT });
     this.hookGraphics = this.add.graphics().setDepth(10);
 
     const style = { fontFamily: "monospace", fontSize: "20px", color: "#1d1a14" };
@@ -65,6 +80,8 @@ export class GameScene extends Phaser.Scene {
       target: this.add.text(16, 40, "", style),
       level: this.add.text(GAME_WIDTH - 16, 12, "", style).setOrigin(1, 0),
       time: this.add.text(GAME_WIDTH - 16, 40, "", style).setOrigin(1, 0),
+      crit: this.add.text(GAME_WIDTH - 16, 68, "", { ...style, fontSize: "16px", color: "#8e0038" }).setOrigin(1, 0),
+      upgrades: this.add.text(16, GAME_HEIGHT - 10, this.upgradeSummary(), { ...style, fontSize: "14px", color: "#e8d9b8" }).setOrigin(0, 1),
     };
 
     const fire = () => this.hook.fire();
@@ -87,7 +104,8 @@ export class GameScene extends Phaser.Scene {
       return;
     }
 
-    const { grabbed, delivered } = this.hook.update(dt, this.field);
+    const { grabbed, delivered, tooHeavy } = this.hook.update(dt, this.field);
+    if (tooHeavy.length > 0) this.popup("Too heavy!", "#b71c1c", this.hook.tipX, this.hook.tipY - 20);
     if (grabbed.length > 0) {
       this.field = this.field.filter((item) => !grabbed.includes(item));
       for (const item of grabbed) {
@@ -114,9 +132,11 @@ export class GameScene extends Phaser.Scene {
 
   private collect(item: FieldItem): void {
     this.removeSprite(item.id);
-    this.popup(`+$${item.value}`, item.value > 0 ? "#2e7d32" : "#5d4037");
     void this.send(() => this.api.collect(this.run.run_id, item.id)).then((res) => {
       this.run.money = res.money;
+      this.run.crit_chance = res.crit_chance;
+      if (res.critical) this.popup(`CRITICAL x2!  +$${res.value}`, "#c2185b");
+      else this.popup(`+$${res.value}`, "#2e7d32");
     });
   }
 
@@ -145,9 +165,9 @@ export class GameScene extends Phaser.Scene {
     this.sprites.delete(id);
   }
 
-  private popup(text: string, color: string): void {
+  private popup(text: string, color: string, x = HOOK_ORIGIN.x + 40, y = GROUND_Y - 40): void {
     const label = this.add
-      .text(HOOK_ORIGIN.x + 40, GROUND_Y - 40, text, { fontFamily: "monospace", fontSize: "24px", color, fontStyle: "bold" })
+      .text(x, y, text, { fontFamily: "monospace", fontSize: "24px", color, fontStyle: "bold" })
       .setOrigin(0, 0.5)
       .setDepth(20);
     this.tweens.add({ targets: label, y: label.y - 30, alpha: 0, duration: 900, onComplete: () => label.destroy() });
@@ -173,6 +193,14 @@ export class GameScene extends Phaser.Scene {
     this.hud.target.setText(`Target $${this.run.target}`);
     this.hud.level.setText(`Level ${this.run.level}`);
     this.hud.time.setText(`Time ${Math.ceil(this.timeLeft)}`).setColor(this.timeLeft <= 10 ? "#b71c1c" : "#1d1a14");
+    this.hud.crit.setText(this.run.crit_chance > 0 ? `Crit ${Math.round(this.run.crit_chance * 100)}%` : "");
+  }
+
+  private upgradeSummary(): string {
+    const all = (this.registry.get("upgrades") as Upgrade[] | undefined) ?? [];
+    const names = new Map(all.map((u) => [u.id, u.name]));
+    const owned = Object.entries(this.run.upgrades).map(([id, n]) => `${names.get(id) ?? id}${n > 1 ? ` x${n}` : ""}`);
+    return owned.length ? `Upgrades: ${owned.join(" · ")}` : "";
   }
 
   private drawHook(): void {
@@ -189,5 +217,10 @@ export class GameScene extends Phaser.Scene {
       g.lineBetween(tipX, tipY, tipX + Math.sin(a) * prong, tipY + Math.cos(a) * prong);
     }
     g.fillStyle(0x616161).fillCircle(tipX, tipY, 4);
+
+    // Magnetic Hook: show the pull range while the hook is out.
+    if (this.hook.params.magnetRadius > 0 && this.hook.state === "shooting") {
+      g.lineStyle(1, 0x64b5f6, 0.6).strokeCircle(tipX, tipY, this.hook.params.magnetRadius);
+    }
   }
 }

@@ -1,5 +1,5 @@
 import Phaser from "phaser";
-import { fetchMinerals } from "../api/content";
+import { fetchMinerals, fetchUpgrades } from "../api/content";
 import { checkBackendHealth } from "../api/health";
 import { API_BASE_URL } from "../config";
 import { GameApi } from "../api/game";
@@ -51,6 +51,7 @@ export class BootScene extends Phaser.Scene {
 
     try {
       this.registry.set("minerals", await fetchMinerals(API_BASE_URL));
+      this.registry.set("upgrades", await fetchUpgrades(API_BASE_URL));
     } catch {
       prompt.setText("Could not load game data from the backend").setColor("#ff6b6b");
       return;

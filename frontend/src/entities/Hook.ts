@@ -7,6 +7,10 @@ export interface Grabbable {
   y: number;
   radius: number;
   weight: number;
+  /** Small items can share a throw when capacity > 1. */
+  small: boolean;
+  /** Magnetic items are pulled in when the hook passes nearby (Magnetic Hook). */
+  magnetic: boolean;
 }
 
 export interface HookEvents<T> {
@@ -14,6 +18,8 @@ export interface HookEvents<T> {
   grabbed: T[];
   /** Items that reached the miner this update (the caller should award their value). */
   delivered: T[];
+  /** Items the hook touched but could not lift. */
+  tooHeavy: T[];
 }
 
 export interface Bounds {
@@ -74,7 +80,7 @@ export class Hook<T extends Grabbable> {
   }
 
   update(dt: number, items: readonly T[]): HookEvents<T> {
-    const events: HookEvents<T> = { grabbed: [], delivered: [] };
+    const events: HookEvents<T> = { grabbed: [], delivered: [], tooHeavy: [] };
     let remaining = dt;
     while (remaining > 0) {
       const step = Math.min(remaining, MAX_STEP);
@@ -91,22 +97,11 @@ export class Hook<T extends Grabbable> {
         this.angle = this.params.maxAngle * Math.sin(this.swingTime * this.params.swingSpeed);
         break;
 
-      case "shooting": {
+      case "shooting":
         this.length += this.params.shootSpeed * dt;
-        const hit = items.find(
-          (item) =>
-            !events.grabbed.includes(item) &&
-            Math.hypot(item.x - this.tipX, item.y - this.tipY) <= item.radius + this.params.grabRadius,
-        );
-        if (hit) {
-          this.carried.push(hit);
-          events.grabbed.push(hit);
-          this.state = "reeling";
-        } else if (this.isOutOfBounds()) {
-          this.state = "reeling";
-        }
+        this.checkGrabs(items, events);
+        if (this.state === "shooting" && this.isOutOfBounds()) this.state = "reeling";
         break;
-      }
 
       case "reeling":
         this.length -= this.currentReelSpeed * dt;
@@ -121,19 +116,56 @@ export class Hook<T extends Grabbable> {
     this.positionCarried();
   }
 
+  private checkGrabs(items: readonly T[], events: HookEvents<T>): void {
+    const free = (item: T) => !this.carried.includes(item);
+    const distance = (item: T) => Math.hypot(item.x - this.tipX, item.y - this.tipY) - item.radius;
+
+    // Magnetic Hook: small gold nearby jumps onto the hook.
+    if (this.params.magnetRadius > 0) {
+      for (const item of items) {
+        if (this.state !== "shooting") return;
+        if (item.magnetic && free(item) && distance(item) <= this.params.magnetRadius) this.grab(item, events);
+      }
+    }
+
+    const hit = items.find((item) => free(item) && distance(item) <= this.params.grabRadius);
+    if (!hit) return;
+
+    if (hit.weight > this.params.maxLiftWeight) {
+      events.tooHeavy.push(hit);
+      this.state = "reeling";
+    } else if (this.carried.length > 0 && !hit.small) {
+      // Double Hook: already carrying a small item, a bigger one just stops the hook.
+      this.state = "reeling";
+    } else {
+      this.grab(hit, events);
+    }
+  }
+
+  private grab(item: T, events: HookEvents<T>): void {
+    this.carried.push(item);
+    events.grabbed.push(item);
+    // Keep going only while carrying small items and there is room for more.
+    const canTakeMore = item.small && this.carried.length < this.params.capacity;
+    if (!canTakeMore) this.state = "reeling";
+  }
+
   private isOutOfBounds(): boolean {
     const x = this.tipX;
     const y = this.tipY;
     return x < 0 || x > this.bounds.width || y > this.bounds.height;
   }
 
-  /** Carried items hang just past the tip, along the rope direction. */
+  /** Carried items hang past the tip along the rope direction, one after another. */
   private positionCarried(): void {
     const dx = Math.sin(this.angle);
     const dy = Math.cos(this.angle);
+    let offset = 0;
     for (const item of this.carried) {
-      item.x = this.tipX + dx * item.radius;
-      item.y = this.tipY + dy * item.radius;
+      offset += item.radius;
+      item.x = this.tipX + dx * offset;
+      item.y = this.tipY + dy * offset;
+      offset += item.radius;
     }
   }
 }

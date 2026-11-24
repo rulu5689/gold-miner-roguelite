@@ -3,7 +3,15 @@
 from fastapi import APIRouter, HTTPException
 
 from app.engine.game_engine import GameRuleError
-from app.schemas.run import CollectResponse, CreateRunRequest, ExplodeResponse, ItemRequest, LevelResult, RunState
+from app.schemas.run import (
+    ChooseUpgradeRequest,
+    CollectResponse,
+    CreateRunRequest,
+    ExplodeResponse,
+    ItemRequest,
+    LevelResult,
+    RunState,
+)
 from app.services import game_service
 from app.services.run_store import RunNotFoundError
 
@@ -42,3 +50,8 @@ def explode(run_id: str, body: ItemRequest) -> ExplodeResponse:
 @router.post("/runs/{run_id}/finish-level", response_model=LevelResult)
 def finish_level(run_id: str) -> LevelResult:
     return _handle(game_service.finish_level, run_id)
+
+
+@router.post("/runs/{run_id}/upgrades", response_model=RunState)
+def choose_upgrade(run_id: str, body: ChooseUpgradeRequest) -> RunState:
+    return _handle(game_service.choose_upgrade, run_id, body.upgrade_id)

@@ -1,4 +1,4 @@
-import type { LevelResult, RunState } from "../game/types";
+import type { CollectResult, LevelResult, RunState } from "../game/types";
 import { requestJson } from "./client";
 
 const post = (body?: unknown): RequestInit => ({
@@ -17,7 +17,7 @@ export class GameApi {
     return requestJson(this.baseUrl, "/game/runs", post(seed === undefined ? {} : { seed }), this.fetchFn);
   }
 
-  collect(runId: string, itemId: number): Promise<{ value: number; money: number }> {
+  collect(runId: string, itemId: number): Promise<CollectResult> {
     return requestJson(this.baseUrl, `/game/runs/${runId}/collect`, post({ item_id: itemId }), this.fetchFn);
   }
 
@@ -27,5 +27,9 @@ export class GameApi {
 
   finishLevel(runId: string): Promise<LevelResult> {
     return requestJson(this.baseUrl, `/game/runs/${runId}/finish-level`, post(), this.fetchFn);
+  }
+
+  chooseUpgrade(runId: string, upgradeId: string): Promise<RunState> {
+    return requestJson(this.baseUrl, `/game/runs/${runId}/upgrades`, post({ upgrade_id: upgradeId }), this.fetchFn);
   }
 }

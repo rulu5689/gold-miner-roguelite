@@ -9,6 +9,7 @@ from app.core.rng import make_rng
 from app.engine.difficulty_engine import item_count, level_quota
 from app.schemas.mineral import Mineral
 from app.schemas.run import FieldItem
+from app.schemas.upgrade import HookModifiers
 
 WORLD_WIDTH = 960
 WORLD_HEIGHT = 540
@@ -30,6 +31,8 @@ PLACEMENT_TRIES = 60
 #: Treasure on the field must be worth at least this multiple of the level quota.
 VALUE_MARGIN = 2
 FILLER_MINERAL = "gold_medium"
+#: Items heavier than a hook without upgrades can lift don't count toward "winnable".
+BASE_MAX_LIFT = HookModifiers().max_lift_weight
 
 
 def generate_level(
@@ -48,7 +51,7 @@ def generate_level(
     filler = next((m for m in pool if m.id == FILLER_MINERAL), pool[0])
     needed = level_quota(level) * VALUE_MARGIN
     for _ in range(30):
-        if sum(item.value for item in items) >= needed:
+        if sum(item.value for item in items if item.weight <= BASE_MAX_LIFT) >= needed:
             break
         _place(items, filler, rng, area)
     return items
