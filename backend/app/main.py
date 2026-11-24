@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api import game, player
+from app.api import config, game, player
 from app.core.config import settings
 from app.schemas.health import HealthResponse
 
@@ -14,6 +14,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+app.include_router(config.router)
 app.include_router(game.router)
 app.include_router(player.router)
 

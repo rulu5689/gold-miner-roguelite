@@ -2,7 +2,22 @@
 
 A browser-based, single-player Gold Miner game with roguelite upgrades.
 
-**Status: MLP 0.1 — project initialization only.** No gameplay yet.
+**Status: MLP 0.2 — classic core gameplay.**
+
+## How to play
+
+- The hook swings back and forth. Press **SPACE**, **↓** or **click/tap** to fire it.
+- Grab gold, diamonds and mystery bags for money. Rocks are worth little and heavy items reel in slowly.
+- Each level lasts **60 seconds**. Reach the (cumulative) target money to go to the next level; otherwise the run ends.
+
+## Roadmap
+
+| Milestone | Content |
+|---|---|
+| 0.1 | Project setup, `/health` check ✅ |
+| 0.2 | Hook swing/shoot/reel, minerals, timer, target money ✅ |
+| 0.3 | Backend: seeded level generation, scoring rules, run state |
+| 0.4 | Hook upgrades (choose 1 of 3 after each level): Quick Reel, Magnetic Hook, Heavy Duty, Double Hook, Precision |
 
 ## Tech stack
 
@@ -58,6 +73,8 @@ source .venv/bin/activate        # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
 uvicorn app.main:app --reload --port 8001
 ```
+
+Endpoints: `GET /health`, `GET /config/minerals` (mineral data from `app/data/minerals.json`).
 
 Check it: <http://localhost:8001/health> returns `{"status":"ok"}`. API docs: <http://localhost:8001/docs>.
 
